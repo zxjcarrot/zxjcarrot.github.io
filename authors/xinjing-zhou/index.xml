@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Xinjing Zhou</title>
+    <link>https://zxjcarrot.github.io/authors/xinjing-zhou/</link>
+      <atom:link href="https://zxjcarrot.github.io/authors/xinjing-zhou/index.xml" rel="self" type="application/rss+xml" />
+    <description>Xinjing Zhou</description>
+    <generator>Source Themes Academic (https://sourcethemes.com/academic/)</generator><language>en-us</language><lastBuildDate>Sun, 01 Dec 2019 00:00:00 +0000</lastBuildDate>
+    <image>
+      <url>img/map[gravatar:%!s(bool=false) shape:circle]</url>
+      <title>Xinjing Zhou</title>
+      <link>https://zxjcarrot.github.io/authors/xinjing-zhou/</link>
+    </image>
+    
+    <item>
+      <title>DPTree: Differential Indexing for Persistent Memory</title>
+      <link>https://zxjcarrot.github.io/publication/10-14778-3372716-3372717/</link>
+      <pubDate>Sun, 01 Dec 2019 00:00:00 +0000</pubDate>
+      <guid>https://zxjcarrot.github.io/publication/10-14778-3372716-3372717/</guid>
+      <description></description>
+    </item>
+    
+  </channel>
+</rss>
