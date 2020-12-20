@@ -25,7 +25,11 @@
       <link>https://zxjcarrot.github.io/post/dptree/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       <guid>https://zxjcarrot.github.io/post/dptree/</guid>
-      <description></description>
+      <description>&lt;h2 id=&#34;综述&#34;&gt;综述&lt;/h2&gt;
+&lt;p&gt;本文是对
+&lt;a href=&#34;http://www.vldb.org/pvldb/vol13/p421-zhou.pdf&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;DPTree&lt;/a&gt;论文的一个讲解.&lt;/p&gt;
+&lt;h2 id=&#34;为什么要再来个一个nvm索引&#34;&gt;为什么要再来个一个NVM索引&lt;/h2&gt;
+</description>
     </item>
     
     <item>
