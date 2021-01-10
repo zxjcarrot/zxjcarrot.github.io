@@ -22,6 +22,30 @@
 &lt;a href=&#34;http://conanhujinming.github.io&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;胡神&lt;/a&gt;邀请(a.k.a, push)，写篇文章讲下
 &lt;a href=&#34;http://www.vldb.org/pvldb/vol13/p421-zhou.pdf&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;DPTree&lt;/a&gt;的核心思想和来源。&lt;/p&gt;
 &lt;/blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;a href=&#34;#%e8%83%8c%e6%99%af&#34;&gt;背景&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+&lt;a href=&#34;#%e7%81%b5%e6%84%9f%e6%9d%a5%e6%ba%90-hybrid-index&#34;&gt;灵感来源: Hybrid Index&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+&lt;a href=&#34;#dptree-%e5%86%99%e4%bc%98%e5%8c%96nvm%e7%b4%a2%e5%bc%95%e7%bb%93%e6%9e%84&#34;&gt;DPTree: 写优化NVM索引结构&lt;/a&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;a href=&#34;#in-place-merge&#34;&gt;In-Place Merge&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+&lt;a href=&#34;#%e8%af%bb%e4%bc%98%e5%8c%96&#34;&gt;读优化&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;a href=&#34;#%e6%80%bb%e7%bb%93&#34;&gt;总结&lt;/a&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;a href=&#34;#%e6%84%9f%e6%83%b3&#34;&gt;感想&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;a href=&#34;#%e5%8f%82%e8%80%83%e6%96%87%e7%8c%ae&#34;&gt;参考文献&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
 &lt;h2 id=&#34;背景&#34;&gt;背景&lt;/h2&gt;
 &lt;p&gt;2019年4月，Intel的Optane DC PMM商用了，数据库领域研究了几十年的NVM终于有真实NVM硬件可以用了，研究者们也是喜大普奔。如学术界预测，实际NVM硬件存在着读写性能不对称的问题，即读带宽要高于写带宽。在Optane DC PMM上，单DIMM的读写带宽差距高达3倍&lt;sup&gt;[6]&lt;/sup&gt;。同时这么多年的NVM相关研究中，索引结构对于数据系统来说是一个非常重要的组件，NVM研究领域中里其实已非常多的索引结构相关研究了，例如CDDS-Tree&lt;sup&gt;[1]&lt;/sup&gt;, FPTree&lt;sup&gt;[2]&lt;/sup&gt;, wB&lt;sup&gt;+&lt;/sup&gt;-Trees&lt;sup&gt;[3]&lt;/sup&gt;, BzTree&lt;sup&gt;[4]&lt;/sup&gt;等等，这些工作提出了很多有用的NVM索引设计技巧，但是在NVM写入优化方面没有研究的非常透彻。不同于这些工作，DPTree是一种针对写优化的NVM索引结构，缓解现有NVM硬件下的写性能较差问题，同时也采用了很多前人的NVM索引设计技巧。&lt;/p&gt;
 &lt;h2 id=&#34;灵感来源-hybrid-index&#34;&gt;灵感来源: Hybrid Index&lt;/h2&gt;
@@ -53,7 +77,7 @@ In-place merge的核心在于针对base tree的每个叶子节点，我们存储
 &lt;li&gt;&lt;strong&gt;Hash-based + Fingerprinting Leaf Design&lt;/strong&gt; 我们知道base tree叶子节点内进行顺序查询平均情况下需要读取一半的数据才能完成查询。为进一步加速叶子节点内的查询，我们将KV数组以hash table的形式进行组织，hash冲突解决采用linear probing的方式，对cache极其友好。同时DPTree借鉴了FPTree的fingerprinting技术。在Figure 3中，元数据信息中为每个key维护了1 byte大小的指纹信息，查询时先比对元数据的key的指纹信息，这样能够在key不存在的情况下进一步减少查询代价(大部分情况下不需要访问KV数组)。两种优化组合保证了大部分情况下successful lookup只需要两次cache-miss，unsuccessful lookup只需要一次cache-miss。同时linear probing的hash组织结构让fingerprint的检查也再次减少(FPTree中KV数组是无序的，需要线性扫描)。&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;Accelerating Range Queries using Order Array&lt;/strong&gt; 现有NVM索引的leaf节点大多都采用无序存储(FPTree, BzTree)，这样执行range查询，即有序输出一个范围里的KV数据，需要首先执行sorting，因此导致range查询代价较高。DPTree吸纳wB&lt;sup&gt;+&lt;/sup&gt;-Trees的设计思想，在元数据中加入了一个小索引数组(order array, O)，用于表示KV数组的内的数据顺序，以加速range查询。即KV[O[0]]表示了key最小的数据，KV[O[1]]表示了key第二小的数据，以此类推。&lt;/li&gt;
 &lt;/ol&gt;
-&lt;p&gt;经过这一系列的读优化，实验表明，DPTree的点读延迟是最低的，同时range查询也只比叶节点有序存储的B树(fastfair&lt;sup&gt;[7]&lt;/sup&gt;)略差。注意到在base tree的这些读优化技术引入了更多的元数据，但是NVM写入代价依旧能够做到很低，这还是要归功于批量更新和in-place合并，让DPTree能够以很低的NVM写入代价来加速读，使得DPTree整体在读和写方面表现得都非常优秀。&lt;/p&gt;
+&lt;p&gt;经过这一系列的读优化，实验表明，DPTree的点读延迟是最低的，同时range查询也只比叶节点有序存储的B树(fastfair&lt;sup&gt;[7]&lt;/sup&gt;)略差。注意到在base tree的这些读优化技术引入了更多的元数据，但是NVM写入代价依旧能够做到很低，这还是要归功于批量更新和in-place合并，让DPTree能够以很低的NVM写入代价来引入更多对读有帮助的元数据，使得DPTree整体在读和写方面表现得都非常优秀。&lt;/p&gt;
 &lt;h2 id=&#34;总结&#34;&gt;总结&lt;/h2&gt;
 &lt;p&gt;DPTree的核心思想是批量更新和原地合并来降低元数据的更新代价，使用两级数据结构来构造一个索引结构。DPTree为了弥补两级结构带来的读延迟增加，引入了许多读优化技术，将读延迟做到了现有索引结构中最低，同时保持最少的NVM写入次数，这归功于批量更新和原地合并技巧。当然本文只是DPTree一个简单的介绍，对于具体合并步骤实现和以及并发DPTree的等复杂设计，感兴趣的同学可以再看下原论文。这里分别再给出
 &lt;a href=&#34;https://github.com/zxjcarrot/DPTree-code&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;代码&lt;/a&gt;和
