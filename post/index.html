@@ -541,7 +541,7 @@ Hybrid Index的Motivation在于降低内存索引结构的空间开销，方法�
 我注意到Hybrid Index这种批量更新static stage的方法不仅可以用来降低内存索引的空间开销，其实还可以用来帮助NVM索引降低写入开销。因为批量更新的思想其实能够很好地均摊NVM索引写入操作的元数据更新代价：比如说很常见的NVM索引叶子节点原子更新技巧，每次对叶子节点的写入一个KV数据后，首先需要保证KV数据刷入NVM，然后需要更新叶子节点的bitmap，通常bitmap不超过8B，可以使用8B failure-atomic update技巧 (bitmap通常用于记录节点中kv slots/array的分配情况，这是一种非常实用的NVM数据结构设计技巧)。为了保证索引结构的crash-consitency特性，这些诸如bitmap的元数据更新往往是需要单独的一次NVM写入的。因此，这类元数据往往会占据较多NVM索引写入开销。如果我们能批量地往一个叶子节点里写入多个KV，那么对于bitmap这类的元数据更新代价就能被均摊开了，这就是DPTree的核心insight。
 DPTree: 写优化NVM索引结构 如Figure 1所示，DPTree在NVM场景下采用了类似Hybrid Index的二级架构，引入buffer tree和base tree的结构。其中，buffer tree存储在DRAM中，其crash-consitency用一个NVM log来保证，这点类似于LSMT的memtable，处理来针对DPTree的insert/delete/update/get/range请求。base tree存储在NVM中，处理只读请求，并针对读和合并进行了优化。DPTree针对buffer tree和base tree的维护一个大小比例R，当buffer与base的大小比超过R时候，会将buffer合入base tree。这里我们类似前人的工作，假设插入的KV是固定长度的。
 注意到这里DPTree的buffer tree虽然采用了logging，但是针对NVM做出了优化，能够做到单条cache-line大小日志的只需要接近一次的NVM顺序写入，对细节感兴趣的同学可以读下论文2.1部分。
-In-Place Merge 在处理buffer合入base的过程中，我们当然可以直接采用LSMT的out-of-place这种简单的合并方式，但是我们发现这种out-of-place合并方式可能会产生1/R的NVM写入放大，并不会比传统NVM索引结构有更好的写入改善。我们注意到这种out-of-place的合并方式其实是适合block-storage的，如HDD/SSD这类无法进行按字节寻址的设备，并没有利用上NVM可以按字节寻址这个特性。因此DPTree设计了一种in-place merge方式，来利用NVM这种独特的性质降低写入量。
+In-Place Merge 在处理buffer合入base的过程中，我们当然可以直接采用LSMT的out-of-place这种简单的合并方式，但是我们发现这种out-of-place合并方式可能会产生1/R的NVM写入放大，并不会比传统NVM索引结构有更好的写入改善。我们注意到这种out-of-place的合并方式适合block-storage，即HDD/SSD这类无法进行按字节寻址的设备，并没有利用上NVM可以按字节寻址这个特性。因此DPTree设计了一种in-place merge方式，来利用NVM这种独特的性质降低写入量。
     </div>
     
 

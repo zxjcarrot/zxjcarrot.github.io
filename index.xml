@@ -44,7 +44,7 @@
 &lt;p&gt;如Figure 1所示，DPTree在NVM场景下采用了类似Hybrid Index的二级架构，引入buffer tree和base tree的结构。其中，buffer tree存储在DRAM中，其crash-consitency用一个NVM log来保证，这点类似于LSMT的memtable，处理来针对DPTree的insert/delete/update/get/range请求。base tree存储在NVM中，处理只读请求，并针对读和合并进行了优化。DPTree针对buffer tree和base tree的维护一个大小比例R，当buffer与base的大小比超过R时候，会将buffer合入base tree。这里我们类似前人的工作，假设插入的KV是固定长度的。&lt;/p&gt;
 &lt;p&gt;注意到这里DPTree的buffer tree虽然采用了logging，但是针对NVM做出了优化，能够做到单条cache-line大小日志的只需要接近一次的NVM顺序写入，对细节感兴趣的同学可以读下论文2.1部分。&lt;/p&gt;
 &lt;h3 id=&#34;in-place-merge&#34;&gt;In-Place Merge&lt;/h3&gt;
-&lt;p&gt;在处理buffer合入base的过程中，我们当然可以直接采用LSMT的out-of-place这种简单的合并方式，但是我们发现这种out-of-place合并方式可能会产生1/R的NVM写入放大，并不会比传统NVM索引结构有更好的写入改善。我们注意到这种out-of-place的合并方式其实是适合block-storage的，如HDD/SSD这类无法进行按字节寻址的设备，并没有利用上NVM可以按字节寻址这个特性。因此DPTree设计了一种in-place merge方式，来利用NVM这种独特的性质降低写入量。&lt;/p&gt;
+&lt;p&gt;在处理buffer合入base的过程中，我们当然可以直接采用LSMT的out-of-place这种简单的合并方式，但是我们发现这种out-of-place合并方式可能会产生1/R的NVM写入放大，并不会比传统NVM索引结构有更好的写入改善。我们注意到这种out-of-place的合并方式适合block-storage，即HDD/SSD这类无法进行按字节寻址的设备，并没有利用上NVM可以按字节寻址这个特性。因此DPTree设计了一种in-place merge方式，来利用NVM这种独特的性质降低写入量。&lt;/p&gt;
 &lt;p&gt;&lt;img src=&#34;https://zxjcarrot.github.io/img/base-leaf.jpg&#34; alt=&#34;image&#34;&gt;
 In-place merge的核心在于针对base tree的每个叶子节点，我们存储两份元数据信息，并由一个全局布尔变量gv来表示当前base tree的叶子节点使用哪一份分元数据。如Figure 3所示，base tree的叶子节点由两份元数据和一个KV数组组成。其中元数据中包含了诸如下一个叶子节点指针（用于range遍历)，bitmap（用于表示kv pool的kv分配状态），cnt(该元数据版本下节点中KV数量），以及一些用于加速读操作的元数据(下一节介绍)。&lt;/p&gt;
 &lt;p&gt;为了实现crash-consistency，处理合并时DPTree遵循一个合并准则：&lt;strong&gt;不会覆盖当前gv变量所指的那一份元数据所表示的KV数据&lt;/strong&gt;。&lt;/p&gt;
