@@ -29,9 +29,10 @@
     
   
   <meta name="description" content="应好友 胡神邀请(a.k.a. push)，写篇文章讲下 DPTree的核心思想和来源。
-   背景  灵感来源: Hybrid Index  DPTree: 写优化NVM索引结构   In-Place Merge  读优化    总结   感想    参考文献  背景 2019年4月，Intel的Optane DC PMM商用了，数据库领域研究了几十年的NVM终于有真实NVM硬件可以用了，研究者们也是喜大普奔。如学术界预测，实际NVM硬件存在着读写性能不对称的问题，即读带宽要高于写带宽。在Optane DC PMM上，单DIMM的读写带宽差距高达3倍[6]。同时这么多年的NVM相关研究中，索引结构对于数据系统来说是一个非常重要的组件，NVM研究领域中里其实已非常多的索引结构相关研究了，例如CDDS-Tree[1], FPTree[2], wB&#43;-Trees[3], BzTree[4]等等，这些工作提出了很多有用的NVM索引设计技巧，但是在NVM写入优化方面没有研究的非常透彻。不同于这些工作，DPTree是一种针对写优化的NVM索引结构，缓解现有NVM硬件下的写性能较差问题，同时也采用了很多前人的NVM索引设计技巧。
+   背景  灵感来源: Hybrid Index  DPTree: 写优化NVM索引结构   In-Place Merge  读优化    总结  感想  参考文献  背景 2019年4月，Intel的Optane DC PMM商用了，数据库领域研究了几十年的NVM终于有真实NVM硬件可以用了，研究者们也是喜大普奔。如学术界预测，实际NVM硬件存在着读写性能不对称的问题，即读带宽要高于写带宽。在Optane DC PMM上，单DIMM的读写带宽差距高达3倍[6]。同时这么多年的NVM相关研究中，索引结构对于数据系统来说是一个非常重要的组件，NVM研究领域中里其实已非常多的索引结构相关研究了，例如CDDS-Tree[1], FPTree[2], wB&#43;-Trees[3], BzTree[4]等等，这些工作提出了很多有用的NVM索引设计技巧，但是在NVM写入优化方面没有研究的非常透彻。不同于这些工作，DPTree是一种针对写优化的NVM索引结构，缓解现有NVM硬件下的写性能较差问题，同时也采用了很多前人的NVM索引设计技巧。
 灵感来源: Hybrid Index 研一的时候哼哧哼哧读了CMU 15-721(强烈推荐)课程中不少论文，在 database compression一节中一篇关于Hybrid Index的论文[5]引起了我的注意(Hybrid Index的一作 Huanchen Zhang 也是SuRF的一作, SuRF拿了SIGMOD&rsquo;18 Best Paper Award, 这老哥太猛了orz)。
-Hybrid Index的Motivation在于降低内存索引结构的空间开销，方法是采用dual-stage的索引框架，将一个索引结构分成dynamic和static两个stage。以B&#43;Tree为例，Hybrid B&#43;Tree的dynamic stage是一个write buffer，比如是普通的B&#43;Tree，处理insert/delete/update/get/range操作；static stage是一个空间优化过的只读B&#43;Tree结构。dynamic stage的buffer 满的时候与static stage进行归并合并，产生出一个新的static stage。由于static stage只处理get/range查询，同时更新的时候采用out-of-place 合并更新，那么传统B&#43;Tree很多结构上的空间overhead就可以进行优化了：如节点间的指针、叶子节点内部用于处理写入的预留空间等等。">
+Hybrid Index的Motivation在于降低内存索引结构的空间开销，方法是采用dual-stage的索引框架，将一个索引结构分成dynamic和static两个stage。以B&#43;Tree为例，Hybrid B&#43;Tree的dynamic stage是一个write buffer，比如是普通的B&#43;Tree，处理insert/delete/update/get/range操作；static stage是一个空间优化过的只读B&#43;Tree结构。dynamic stage的buffer 满的时候与static stage进行归并合并，产生出一个新的static stage。由于static stage只处理get/range查询，同时更新的时候采用out-of-place 合并更新，那么传统B&#43;Tree很多结构上的空间overhead就可以进行优化了：如节点间的指针、叶子节点内部用于处理写入的预留空间等等。
+我注意到Hybrid Index这种批量更新static stage的方法不仅可以用来降低内存索引的空间开销，其实还可以用来帮助NVM索引降低写入开销。因为批量更新的思想其实能够很好地均摊NVM索引写入操作的元数据更新代价：比如说很常见的NVM索引叶子节点原子更新技巧，每次对叶子节点的写入一个KV数据后，首先需要保证KV数据刷入NVM，然后需要更新叶子节点的bitmap，通常bitmap不超过8B，可以使用8B failure-atomic update技巧 (bitmap通常用于记录节点中kv slots/array的分配情况，这是一种非常实用的NVM数据结构设计技巧)。为了保证索引结构的crash-consitency特性，这些诸如bitmap的元数据更新往往是需要单独的一次NVM写入的。因此，这类元数据往往会占据较多NVM索引写入开销。如果我们能批量地往一个叶子节点里写入多个KV，那么对于bitmap这类的元数据更新代价就能被均摊开了，这就是DPTree的核心insight。">
 
   
   <link rel="alternate" hreflang="en-us" href="https://zxjcarrot.github.io/post/dptree/">
@@ -235,9 +236,10 @@ Hybrid Index的Motivation在于降低内存索引结构的空间开销，方法�
   <meta property="og:url" content="https://zxjcarrot.github.io/post/dptree/">
   <meta property="og:title" content=" | Xinjing Zhou">
   <meta property="og:description" content="应好友 胡神邀请(a.k.a. push)，写篇文章讲下 DPTree的核心思想和来源。
-   背景  灵感来源: Hybrid Index  DPTree: 写优化NVM索引结构   In-Place Merge  读优化    总结   感想    参考文献  背景 2019年4月，Intel的Optane DC PMM商用了，数据库领域研究了几十年的NVM终于有真实NVM硬件可以用了，研究者们也是喜大普奔。如学术界预测，实际NVM硬件存在着读写性能不对称的问题，即读带宽要高于写带宽。在Optane DC PMM上，单DIMM的读写带宽差距高达3倍[6]。同时这么多年的NVM相关研究中，索引结构对于数据系统来说是一个非常重要的组件，NVM研究领域中里其实已非常多的索引结构相关研究了，例如CDDS-Tree[1], FPTree[2], wB&#43;-Trees[3], BzTree[4]等等，这些工作提出了很多有用的NVM索引设计技巧，但是在NVM写入优化方面没有研究的非常透彻。不同于这些工作，DPTree是一种针对写优化的NVM索引结构，缓解现有NVM硬件下的写性能较差问题，同时也采用了很多前人的NVM索引设计技巧。
+   背景  灵感来源: Hybrid Index  DPTree: 写优化NVM索引结构   In-Place Merge  读优化    总结  感想  参考文献  背景 2019年4月，Intel的Optane DC PMM商用了，数据库领域研究了几十年的NVM终于有真实NVM硬件可以用了，研究者们也是喜大普奔。如学术界预测，实际NVM硬件存在着读写性能不对称的问题，即读带宽要高于写带宽。在Optane DC PMM上，单DIMM的读写带宽差距高达3倍[6]。同时这么多年的NVM相关研究中，索引结构对于数据系统来说是一个非常重要的组件，NVM研究领域中里其实已非常多的索引结构相关研究了，例如CDDS-Tree[1], FPTree[2], wB&#43;-Trees[3], BzTree[4]等等，这些工作提出了很多有用的NVM索引设计技巧，但是在NVM写入优化方面没有研究的非常透彻。不同于这些工作，DPTree是一种针对写优化的NVM索引结构，缓解现有NVM硬件下的写性能较差问题，同时也采用了很多前人的NVM索引设计技巧。
 灵感来源: Hybrid Index 研一的时候哼哧哼哧读了CMU 15-721(强烈推荐)课程中不少论文，在 database compression一节中一篇关于Hybrid Index的论文[5]引起了我的注意(Hybrid Index的一作 Huanchen Zhang 也是SuRF的一作, SuRF拿了SIGMOD&rsquo;18 Best Paper Award, 这老哥太猛了orz)。
-Hybrid Index的Motivation在于降低内存索引结构的空间开销，方法是采用dual-stage的索引框架，将一个索引结构分成dynamic和static两个stage。以B&#43;Tree为例，Hybrid B&#43;Tree的dynamic stage是一个write buffer，比如是普通的B&#43;Tree，处理insert/delete/update/get/range操作；static stage是一个空间优化过的只读B&#43;Tree结构。dynamic stage的buffer 满的时候与static stage进行归并合并，产生出一个新的static stage。由于static stage只处理get/range查询，同时更新的时候采用out-of-place 合并更新，那么传统B&#43;Tree很多结构上的空间overhead就可以进行优化了：如节点间的指针、叶子节点内部用于处理写入的预留空间等等。"><meta property="og:image" content="img/map[gravatar:%!s(bool=false) shape:circle]">
+Hybrid Index的Motivation在于降低内存索引结构的空间开销，方法是采用dual-stage的索引框架，将一个索引结构分成dynamic和static两个stage。以B&#43;Tree为例，Hybrid B&#43;Tree的dynamic stage是一个write buffer，比如是普通的B&#43;Tree，处理insert/delete/update/get/range操作；static stage是一个空间优化过的只读B&#43;Tree结构。dynamic stage的buffer 满的时候与static stage进行归并合并，产生出一个新的static stage。由于static stage只处理get/range查询，同时更新的时候采用out-of-place 合并更新，那么传统B&#43;Tree很多结构上的空间overhead就可以进行优化了：如节点间的指针、叶子节点内部用于处理写入的预留空间等等。
+我注意到Hybrid Index这种批量更新static stage的方法不仅可以用来降低内存索引的空间开销，其实还可以用来帮助NVM索引降低写入开销。因为批量更新的思想其实能够很好地均摊NVM索引写入操作的元数据更新代价：比如说很常见的NVM索引叶子节点原子更新技巧，每次对叶子节点的写入一个KV数据后，首先需要保证KV数据刷入NVM，然后需要更新叶子节点的bitmap，通常bitmap不超过8B，可以使用8B failure-atomic update技巧 (bitmap通常用于记录节点中kv slots/array的分配情况，这是一种非常实用的NVM数据结构设计技巧)。为了保证索引结构的crash-consitency特性，这些诸如bitmap的元数据更新往往是需要单独的一次NVM写入的。因此，这类元数据往往会占据较多NVM索引写入开销。如果我们能批量地往一个叶子节点里写入多个KV，那么对于bitmap这类的元数据更新代价就能被均摊开了，这就是DPTree的核心insight。"><meta property="og:image" content="img/map[gravatar:%!s(bool=false) shape:circle]">
   <meta property="twitter:image" content="img/map[gravatar:%!s(bool=false) shape:circle]"><meta property="og:locale" content="en-us">
   
     
@@ -285,7 +287,7 @@ Hybrid Index的Motivation在于降低内存索引结构的空间开销，方法�
       "url": "https://zxjcarrot.github.io/images/icon_hu0b7a4cb9992c9ac0e91bd28ffd38dd00_9727_192x192_fill_lanczos_center_2.png"
     }
   },
-  "description": "应好友 胡神邀请(a.k.a. push)，写篇文章讲下 DPTree的核心思想和来源。\n   背景  灵感来源: Hybrid Index  DPTree: 写优化NVM索引结构   In-Place Merge  读优化    总结   感想    参考文献  背景 2019年4月，Intel的Optane DC PMM商用了，数据库领域研究了几十年的NVM终于有真实NVM硬件可以用了，研究者们也是喜大普奔。如学术界预测，实际NVM硬件存在着读写性能不对称的问题，即读带宽要高于写带宽。在Optane DC PMM上，单DIMM的读写带宽差距高达3倍[6]。同时这么多年的NVM相关研究中，索引结构对于数据系统来说是一个非常重要的组件，NVM研究领域中里其实已非常多的索引结构相关研究了，例如CDDS-Tree[1], FPTree[2], wB+-Trees[3], BzTree[4]等等，这些工作提出了很多有用的NVM索引设计技巧，但是在NVM写入优化方面没有研究的非常透彻。不同于这些工作，DPTree是一种针对写优化的NVM索引结构，缓解现有NVM硬件下的写性能较差问题，同时也采用了很多前人的NVM索引设计技巧。\n灵感来源: Hybrid Index 研一的时候哼哧哼哧读了CMU 15-721(强烈推荐)课程中不少论文，在 database compression一节中一篇关于Hybrid Index的论文[5]引起了我的注意(Hybrid Index的一作 Huanchen Zhang 也是SuRF的一作, SuRF拿了SIGMOD\u0026rsquo;18 Best Paper Award, 这老哥太猛了orz)。\nHybrid Index的Motivation在于降低内存索引结构的空间开销，方法是采用dual-stage的索引框架，将一个索引结构分成dynamic和static两个stage。以B+Tree为例，Hybrid B+Tree的dynamic stage是一个write buffer，比如是普通的B+Tree，处理insert/delete/update/get/range操作；static stage是一个空间优化过的只读B+Tree结构。dynamic stage的buffer 满的时候与static stage进行归并合并，产生出一个新的static stage。由于static stage只处理get/range查询，同时更新的时候采用out-of-place 合并更新，那么传统B+Tree很多结构上的空间overhead就可以进行优化了：如节点间的指针、叶子节点内部用于处理写入的预留空间等等。"
+  "description": "应好友 胡神邀请(a.k.a. push)，写篇文章讲下 DPTree的核心思想和来源。\n   背景  灵感来源: Hybrid Index  DPTree: 写优化NVM索引结构   In-Place Merge  读优化    总结  感想  参考文献  背景 2019年4月，Intel的Optane DC PMM商用了，数据库领域研究了几十年的NVM终于有真实NVM硬件可以用了，研究者们也是喜大普奔。如学术界预测，实际NVM硬件存在着读写性能不对称的问题，即读带宽要高于写带宽。在Optane DC PMM上，单DIMM的读写带宽差距高达3倍[6]。同时这么多年的NVM相关研究中，索引结构对于数据系统来说是一个非常重要的组件，NVM研究领域中里其实已非常多的索引结构相关研究了，例如CDDS-Tree[1], FPTree[2], wB+-Trees[3], BzTree[4]等等，这些工作提出了很多有用的NVM索引设计技巧，但是在NVM写入优化方面没有研究的非常透彻。不同于这些工作，DPTree是一种针对写优化的NVM索引结构，缓解现有NVM硬件下的写性能较差问题，同时也采用了很多前人的NVM索引设计技巧。\n灵感来源: Hybrid Index 研一的时候哼哧哼哧读了CMU 15-721(强烈推荐)课程中不少论文，在 database compression一节中一篇关于Hybrid Index的论文[5]引起了我的注意(Hybrid Index的一作 Huanchen Zhang 也是SuRF的一作, SuRF拿了SIGMOD\u0026rsquo;18 Best Paper Award, 这老哥太猛了orz)。\nHybrid Index的Motivation在于降低内存索引结构的空间开销，方法是采用dual-stage的索引框架，将一个索引结构分成dynamic和static两个stage。以B+Tree为例，Hybrid B+Tree的dynamic stage是一个write buffer，比如是普通的B+Tree，处理insert/delete/update/get/range操作；static stage是一个空间优化过的只读B+Tree结构。dynamic stage的buffer 满的时候与static stage进行归并合并，产生出一个新的static stage。由于static stage只处理get/range查询，同时更新的时候采用out-of-place 合并更新，那么传统B+Tree很多结构上的空间overhead就可以进行优化了：如节点间的指针、叶子节点内部用于处理写入的预留空间等等。\n我注意到Hybrid Index这种批量更新static stage的方法不仅可以用来降低内存索引的空间开销，其实还可以用来帮助NVM索引降低写入开销。因为批量更新的思想其实能够很好地均摊NVM索引写入操作的元数据更新代价：比如说很常见的NVM索引叶子节点原子更新技巧，每次对叶子节点的写入一个KV数据后，首先需要保证KV数据刷入NVM，然后需要更新叶子节点的bitmap，通常bitmap不超过8B，可以使用8B failure-atomic update技巧 (bitmap通常用于记录节点中kv slots/array的分配情况，这是一种非常实用的NVM数据结构设计技巧)。为了保证索引结构的crash-consitency特性，这些诸如bitmap的元数据更新往往是需要单独的一次NVM写入的。因此，这类元数据往往会占据较多NVM索引写入开销。如果我们能批量地往一个叶子节点里写入多个KV，那么对于bitmap这类的元数据更新代价就能被均摊开了，这就是DPTree的核心insight。"
 }
 </script>
 
@@ -627,12 +629,9 @@ Hybrid Index的Motivation在于降低内存索引结构的空间开销，方法�
 </ul>
 </li>
 <li>
-<a href="#%e6%80%bb%e7%bb%93">总结</a>
-<ul>
+<a href="#%e6%80%bb%e7%bb%93">总结</a></li>
 <li>
 <a href="#%e6%84%9f%e6%83%b3">感想</a></li>
-</ul>
-</li>
 <li>
 <a href="#%e5%8f%82%e8%80%83%e6%96%87%e7%8c%ae">参考文献</a></li>
 </ul>
@@ -672,7 +671,7 @@ In-place merge的核心在于针对base tree的每个叶子节点，我们存储
 <p>DPTree的核心思想是批量更新和原地合并来降低元数据的更新代价，使用两级数据结构来构造一个索引结构。DPTree为了弥补两级结构带来的读延迟增加，引入了许多读优化技术，将读延迟做到了现有索引结构中最低，同时保持最少的NVM写入次数，这归功于批量更新和原地合并技巧。当然本文只是DPTree一个简单的介绍，对于具体合并步骤实现和以及并发DPTree的等复杂设计，感兴趣的同学可以再看下原论文。这里分别再给出
 <a href="https://github.com/zxjcarrot/DPTree-code" target="_blank" rel="noopener">代码</a>和
 <a href="https://www.bilibili.com/video/BV1sa4y1J76f/" target="_blank" rel="noopener">VLDB会议录屏</a>，希望对感兴趣的同学有帮助，也欢迎大家多多指正不足，第一次写论文，自认为写作和presentation还是很烂的。</p>
-<h3 id="感想">感想</h3>
+<h2 id="感想">感想</h2>
 <p>读研前连research是啥都不知道，所以研一基本处于一个学习的状态，基本上围绕15445/15721(强烈推荐)来学习数据库系统的理论知识和前沿课题，连DPTree的idea也是来自这里2333333。研二在DPTree工作上总共花了快一年的时间，写作也比较烂，第一次review结果出来因为没有在真实硬件上跑实验给了weak reject，但是reviewer觉得idea害行，给了次revision机会，让我找个真实硬件跑下，后面找了阿里的师兄帮忙弄了个设备，最后能中VLDB也是纯属运气好2333。当然了，这个过程中收获也非常大，比如锻炼了我写作能力，科研能力以及系统编程能力(性能调优，并发编程）等等。同时也离不开老师同学们的帮助，比如帮忙提供NVM硬件的阿里师兄，在论文writing方面帮助我的导师和胡神，非常感激。</p>
 <h2 id="参考文献">参考文献</h2>
 <p>[1] Venkataraman, Shivaram, et al. &ldquo;Consistent and Durable Data Structures for Non-Volatile Byte-Addressable Memory.&rdquo; FAST. Vol. 11. 2011.<br>

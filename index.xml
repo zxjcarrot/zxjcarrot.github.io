@@ -45,12 +45,9 @@
 &lt;/ul&gt;
 &lt;/li&gt;
 &lt;li&gt;
-&lt;a href=&#34;#%e6%80%bb%e7%bb%93&#34;&gt;总结&lt;/a&gt;
-&lt;ul&gt;
+&lt;a href=&#34;#%e6%80%bb%e7%bb%93&#34;&gt;总结&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;
 &lt;a href=&#34;#%e6%84%9f%e6%83%b3&#34;&gt;感想&lt;/a&gt;&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/li&gt;
 &lt;li&gt;
 &lt;a href=&#34;#%e5%8f%82%e8%80%83%e6%96%87%e7%8c%ae&#34;&gt;参考文献&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
@@ -90,7 +87,7 @@ In-place merge的核心在于针对base tree的每个叶子节点，我们存储
 &lt;p&gt;DPTree的核心思想是批量更新和原地合并来降低元数据的更新代价，使用两级数据结构来构造一个索引结构。DPTree为了弥补两级结构带来的读延迟增加，引入了许多读优化技术，将读延迟做到了现有索引结构中最低，同时保持最少的NVM写入次数，这归功于批量更新和原地合并技巧。当然本文只是DPTree一个简单的介绍，对于具体合并步骤实现和以及并发DPTree的等复杂设计，感兴趣的同学可以再看下原论文。这里分别再给出
 &lt;a href=&#34;https://github.com/zxjcarrot/DPTree-code&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;代码&lt;/a&gt;和
 &lt;a href=&#34;https://www.bilibili.com/video/BV1sa4y1J76f/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;VLDB会议录屏&lt;/a&gt;，希望对感兴趣的同学有帮助，也欢迎大家多多指正不足，第一次写论文，自认为写作和presentation还是很烂的。&lt;/p&gt;
-&lt;h3 id=&#34;感想&#34;&gt;感想&lt;/h3&gt;
+&lt;h2 id=&#34;感想&#34;&gt;感想&lt;/h2&gt;
 &lt;p&gt;读研前连research是啥都不知道，所以研一基本处于一个学习的状态，基本上围绕15445/15721(强烈推荐)来学习数据库系统的理论知识和前沿课题，连DPTree的idea也是来自这里2333333。研二在DPTree工作上总共花了快一年的时间，写作也比较烂，第一次review结果出来因为没有在真实硬件上跑实验给了weak reject，但是reviewer觉得idea害行，给了次revision机会，让我找个真实硬件跑下，后面找了阿里的师兄帮忙弄了个设备，最后能中VLDB也是纯属运气好2333。当然了，这个过程中收获也非常大，比如锻炼了我写作能力，科研能力以及系统编程能力(性能调优，并发编程）等等。同时也离不开老师同学们的帮助，比如帮忙提供NVM硬件的阿里师兄，在论文writing方面帮助我的导师和胡神，非常感激。&lt;/p&gt;
 &lt;h2 id=&#34;参考文献&#34;&gt;参考文献&lt;/h2&gt;
 &lt;p&gt;[1] Venkataraman, Shivaram, et al. &amp;ldquo;Consistent and Durable Data Structures for Non-Volatile Byte-Addressable Memory.&amp;rdquo; FAST. Vol. 11. 2011.&lt;br&gt;
